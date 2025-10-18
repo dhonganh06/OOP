@@ -1,112 +1,169 @@
 package arkanoid;
 
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.input.KeyCode;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Iterator;
+import java.util.List;
 
-// Lớp GameManager quản lý logic game
 public class GameManager {
-    private Paddle paddle; // Thanh đỡ
-    private Ball ball; // Quả bóng
-    private List<Brick> bricks; // Danh sách gạch
-    private List<PowerUp> powerUps; // Danh sách power-up
-    private int score; // Điểm số
-    private int lives; // Số mạng
-    private boolean gameOver; // Trạng thái game kết thúc
+    private Paddle paddle;
+    private Ball ball;
+    private List<Brick> bricks;
+    private List<PowerUp> powerUps;
+    private Image backgroundImage;
+    private int score;
+    private int lives;
+    private boolean gameOver;
+    private boolean gameWon;
+    private int currentLevel;
 
-    // Constructor khởi tạo game
     public GameManager() {
-        paddle = new Paddle(350, 550, 100, 10);
-        ball = new Ball(400, 500, 200, 200); // Tăng kích thước bóng từ 10x10 lên 200x200
+        paddle = new Paddle(350, 490, 150, 30);
+        ball = new Ball(400, 300, 20, 20);
         bricks = new ArrayList<>();
         powerUps = new ArrayList<>();
         score = 0;
         lives = 3;
         gameOver = false;
+        gameWon = false;
+        currentLevel = 1;
 
-        // Khởi tạo lưới gạch
-        for (int i = 0; i < 5; i++) {
-            for (int j = 0; j < 10; j++) {
-                bricks.add(new Brick(j * 80 + 10, i * 30 + 50, 70, 20, i % 2 == 0 ? "Normal" : "Strong", i % 2 == 0 ? 1 : 2));
+        try {
+            backgroundImage = new Image(GameManager.class.getResource("/images/background.jpg").toString());
+        } catch (Exception e) {
+            System.out.println("Lỗi không tải");
+            backgroundImage = null;
+        }
+
+        loadLevel(currentLevel);
+    }
+
+    public int getScore() { return this.score; }
+    public int getLives() { return this.lives; }
+    public int getCurrentLevel() { return this.currentLevel; }
+    public boolean isGameOver() { return this.gameOver; }
+    public boolean isGameWon() { return this.gameWon; }
+
+    private void loadLevel(int levelNumber) {
+        bricks.clear();
+        powerUps.clear();
+        String levelFile = "/levels/level" + levelNumber + ".txt";
+        try (InputStream is = GameManager.class.getResourceAsStream(levelFile);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+            if (is == null) {
+                gameWon = true;
+                return;
             }
+            String line;
+            int row = 0;
+            while ((line = reader.readLine()) != null) {
+                for (int col = 0; col < line.length(); col++) {
+                    char blockType = line.charAt(col);
+                    if (blockType == '1') {
+                        bricks.add(new Brick(col * 80 + 10, row * 30 + 50, 70, 20, "Normal", 1));
+                    } else if (blockType == '2') {
+                        bricks.add(new Brick(col * 80 + 10, row * 30 + 50, 70, 20, "Strong", 2));
+                    }
+                }
+                row++;
+            }
+        } catch (Exception e) {
+            gameWon = true;
+            e.printStackTrace();
+        }
+        resetPaddleAndBall();
+    }
+
+    private void resetPaddleAndBall() {
+        ball.setX(400);
+        ball.setY(500);
+        paddle.setX(350);
+    }
+
+    public void handleMouseInput(double mouseX) {
+        if (!gameOver && !gameWon) {
+            paddle.setX(mouseX - paddle.getWidth() / 2);
         }
     }
 
-    // Xử lý đầu vào từ bàn phím
-    public void handleInput(KeyCode code, boolean isPressed) {
-        if (isPressed) {
-            if (code == KeyCode.LEFT) paddle.moveLeft();
-            if (code == KeyCode.RIGHT) paddle.moveRight();
-        } else {
-            paddle.stop();
-        }
-    }
-
-    // Cập nhật trạng thái game
     public void updateGame() {
-        if (gameOver) return;
+        if (gameOver || gameWon) return;
 
         paddle.update();
         ball.update();
 
-        // Kiểm tra va chạm với thanh đỡ
         if (ball.checkCollision(paddle)) {
             ball.bounceOff(paddle);
         }
 
-        // Kiểm tra va chạm với gạch
         Iterator<Brick> brickIterator = bricks.iterator();
         while (brickIterator.hasNext()) {
             Brick brick = brickIterator.next();
-            if (ball.checkCollision(brick) && !brick.isDestroyed()) {
+            if (ball.checkCollision(brick)) {
                 brick.takeHit();
                 ball.bounceOff(brick);
-                score += 10;
-                if (brick.isDestroyed() && Math.random() < 0.2) {
-                    powerUps.add(new ExpandPaddlePowerUp(brick.getX(), brick.getY(), 20, 20));
+                if (brick.isDestroyed()) {
+                    score += 10;
+                    brickIterator.remove();
+                    if (Math.random() < 0.2) {
+                        powerUps.add(new ExpandPaddlePowerUp(brick.getX(), brick.getY(), 20, 20));
+                    }
                 }
             }
         }
 
-        // Kiểm tra va chạm với power-up
         Iterator<PowerUp> powerUpIterator = powerUps.iterator();
         while (powerUpIterator.hasNext()) {
             PowerUp powerUp = powerUpIterator.next();
             powerUp.update();
-            if (ball.checkCollision(powerUp)) {
+            if (paddle.checkCollision(powerUp)) {
                 powerUp.applyEffect(paddle);
                 powerUpIterator.remove();
+            } else if (powerUp.getY() > 600) {
+                powerUpIterator.remove();
             }
-            if (powerUp.getY() > 600) powerUpIterator.remove();
         }
 
-        // Kiểm tra bóng ra ngoài màn hình
         if (ball.getY() > 600) {
             lives--;
-            ball.setX(400);
-            ball.setY(500);
-            ball.update();
-            if (lives <= 0) gameOver = true;
+            if (lives <= 0) {
+                gameOver = true;
+            } else {
+                resetPaddleAndBall();
+            }
+        }
+
+        if (currentLevel == 1 && score >= 90) {
+            currentLevel++;
+            loadLevel(currentLevel);
+        } else if (currentLevel == 2 && score >= 250) {
+            currentLevel++;
+            loadLevel(currentLevel);
         }
     }
 
-    // Vẽ toàn bộ game lên màn hình
     public void render(GraphicsContext gc) {
-        // gc.setFill và gc.fillRect: Tô nền trắng cho toàn bộ màn hình
-        gc.setFill(Color.WHITE);
-        gc.fillRect(0, 0, 800, 600);
+        if (backgroundImage != null) {
+            gc.drawImage(backgroundImage, 0, 0, 800, 540);
+        } else {
+            gc.setFill(Color.BLACK);
+            gc.fillRect(0, 0, 800, 540);
+        }
+
         paddle.render(gc);
         ball.render(gc);
-        for (Brick brick : bricks) brick.render(gc);
-        for (PowerUp powerUp : powerUps) powerUp.render(gc);
+        for (Brick brick : bricks) {
+            brick.render(gc);
+        }
+        for (PowerUp powerUp : powerUps) {
+            powerUp.render(gc);
+        }
 
-        // gc.setFill và gc.fillText: Hiển thị điểm số và số mạng bằng màu đen để tương phản với nền trắng
-        gc.setFill(Color.BLACK);
-        gc.fillText("Score: " + score, 10, 20);
-        gc.fillText("Lives: " + lives, 700, 20);
-        if (gameOver) gc.fillText("Game Over", 350, 300);
     }
 }
