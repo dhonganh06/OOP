@@ -11,8 +11,8 @@ public class ExpandPaddlePowerUp extends PowerUp {
     }
 
     @Override
-    public void applyEffect(Paddle paddle) {
-        paddle.applyPowerUp(type);
+    public boolean applyEffect(Paddle paddle) {
+       return paddle.applyPowerUp(type);
     }
 
     @Override

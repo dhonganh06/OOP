@@ -16,18 +16,23 @@ public class GameManager {
     private Ball ball;
     private List<Brick> bricks;
     private List<PowerUp> powerUps;
+    private List<Bullet> bullets;
     private Image backgroundImage;
     private int score;
     private int lives;
+    private double rate;
     private boolean gameOver;
     private boolean gameWon;
     private int currentLevel;
+    public int brickdestroyed=0;
+
 
     public GameManager() {
         paddle = new Paddle(350, 490, 150, 30);
         ball = new Ball(400, 300, 20, 20);
         bricks = new ArrayList<>();
         powerUps = new ArrayList<>();
+        bullets = new ArrayList<>();
         score = 0;
         lives = 3;
         gameOver = false;
@@ -42,6 +47,13 @@ public class GameManager {
         }
 
         loadLevel(currentLevel);
+    }
+    public int getBulletCount() {
+        return paddle.getBulletCount();
+    }
+
+    public boolean isShooterActive() {
+        return paddle.isShooterActive();
     }
 
     public int getScore() { return this.score; }
@@ -85,11 +97,17 @@ public class GameManager {
         ball.setY(500);
         paddle.setX(350);
     }
+    private void resetPaddle(){
+        paddle.setX(350);
+    }
 
     public void handleMouseInput(double mouseX) {
         if (!gameOver && !gameWon) {
             paddle.setX(mouseX - paddle.getWidth() / 2);
         }
+    }
+    public void handleShoot() {
+        bullets.addAll(paddle.shoot());
     }
 
     public void updateGame() {
@@ -102,18 +120,27 @@ public class GameManager {
             ball.bounceOff(paddle);
         }
 
-        Iterator<Brick> brickIterator = bricks.iterator();
-        while (brickIterator.hasNext()) {
-            Brick brick = brickIterator.next();
+        Iterator<Brick> ballBrickIterator = bricks.iterator();
+        while (ballBrickIterator.hasNext()) {
+            Brick brick = ballBrickIterator.next();
             if (ball.checkCollision(brick)) {
                 brick.takeHit();
                 ball.bounceOff(brick);
                 if (brick.isDestroyed()) {
                     score += 10;
-                    brickIterator.remove();
-                    if (Math.random() < 0.2) {
+                    ballBrickIterator.remove();
+                    brickdestroyed++;
+                    rate = Math.random();
+                    if (rate <=  0.2) {
                         powerUps.add(new ExpandPaddlePowerUp(brick.getX(), brick.getY(), 20, 20));
                     }
+                    if (rate <= 0.4&& rate >0.2) {
+                        powerUps.add(new Shooterpowerup(brick.getX(), brick.getY(), 20, 20));
+                    }
+                    if (rate <= 0.5&& rate > 0.4) {
+                        powerUps.add(new Bomb(brick.getX(), brick.getY(), 20, 20));
+                    }
+
                 }
             }
         }
@@ -123,10 +150,61 @@ public class GameManager {
             PowerUp powerUp = powerUpIterator.next();
             powerUp.update();
             if (paddle.checkCollision(powerUp)) {
-                powerUp.applyEffect(paddle);
+                if (powerUp.type.equals("Bomb")) {
+                    lives--;
+                    score -= 50;
+                    if(lives == 0){
+                        gameOver = true;
+                    }
+                    if (score < 0) {
+                        score = 0;
+                    }
+                    resetPaddle();
+                } else {
+                    boolean effectApplied = powerUp.applyEffect(paddle);
+                    if (effectApplied) {
+                        Sound.getInstance().playSound("powerup");
+                    } else {
+                        score += 100;
+                    }
+                }
+
                 powerUpIterator.remove();
+
             } else if (powerUp.getY() > 600) {
                 powerUpIterator.remove();
+            }
+        }
+
+        // 2. THÊM VÒNG LẶP CHO ĐẠN (BULLET)
+        // (Đảm bảo bạn đã thêm 'List<Bullet> bullets;' và khởi tạo nó)
+        Iterator<Bullet> bulletIterator = bullets.iterator();
+        while (bulletIterator.hasNext()) {
+            Bullet bullet = bulletIterator.next();
+            bullet.update();
+
+            // Xóa đạn nếu ra khỏi màn hình
+            if (bullet.isOutOfBounds()) {
+                bulletIterator.remove();
+                continue;
+            }
+
+            Iterator<Brick> bulletBrickIterator = bricks.iterator();
+            while (bulletBrickIterator.hasNext()) {
+                Brick brick = bulletBrickIterator.next();
+                if (bullet.checkCollision(brick)) {
+                    brick.takeHit(); // Gạch mất máu
+                    bulletIterator.remove(); // Xóa viên đạn
+
+                    if (brick.isDestroyed()) {
+                        score += 10;
+                        bulletBrickIterator.remove(); // <-- Sửa tên ở đây
+                        brickdestroyed++;
+                        // (Bạn có thể cho gạch bị đạn bắn vỡ cũng rơi ra PowerUp ở đây)
+                    }
+                    // Thoát vòng lặp gạch, vì đạn đã trúng 1 viên rồi
+                    break;
+                }
             }
         }
 
@@ -139,14 +217,19 @@ public class GameManager {
             }
         }
 
-        if (currentLevel == 1 && score >= 90) {
+        if (currentLevel == 1 && brickdestroyed==9) {
             currentLevel++;
+            brickdestroyed = 0;
             loadLevel(currentLevel);
-        } else if (currentLevel == 2 && score >= 250) {
+        }else if (currentLevel == 2 && brickdestroyed==19) {
             currentLevel++;
+            brickdestroyed = 0;
             loadLevel(currentLevel);
+        }else if (currentLevel == 3&& brickdestroyed==56)  {
+                gameWon = true;
+            }
         }
-    }
+
 
     public void render(GraphicsContext gc) {
         if (backgroundImage != null) {
@@ -164,6 +247,9 @@ public class GameManager {
         for (PowerUp powerUp : powerUps) {
             powerUp.render(gc);
         }
-
+        for (Bullet bullet : bullets) {
+            bullet.render(gc);
+        }
     }
+
 }

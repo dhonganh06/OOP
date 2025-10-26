@@ -30,7 +30,7 @@ public class ArkanoidGame extends Application {
     private Label scoreLabel;
     private Label levelLabel;
     private Label livesLabel;
-
+    private Label bulletLabel;
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
@@ -64,6 +64,7 @@ public class ArkanoidGame extends Application {
         menuLayout.getChildren().addAll(backgroundImageView, buttonLayout);
 
         Scene menuScene = new Scene(menuLayout, 800, 600);
+        Sound.getInstance().playMusic();
         primaryStage.setScene(menuScene);
     }
 
@@ -83,8 +84,11 @@ public class ArkanoidGame extends Application {
 
         livesLabel = new Label("Lives: 3");
         livesLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: white; -fx-font-weight: bold;");
+        bulletLabel = new Label("Ammo: 0");
+        bulletLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #f1c40f; -fx-font-weight: bold;"); // Màu vàng
+        bulletLabel.setVisible(false);
+        uiBar.getChildren().addAll(scoreLabel, levelLabel, livesLabel, bulletLabel);
 
-        uiBar.getChildren().addAll(scoreLabel, levelLabel, livesLabel);
 
         Canvas canvas = new Canvas(800, 540);
         GraphicsContext gc = canvas.getGraphicsContext2D();
@@ -101,12 +105,22 @@ public class ArkanoidGame extends Application {
                 scoreLabel.setText("Score: " + gameManager.getScore());
                 levelLabel.setText("Level: " + gameManager.getCurrentLevel());
                 livesLabel.setText("Lives: " + gameManager.getLives());
+                if (gameManager.isShooterActive()) {
+                    bulletLabel.setText("Bullet: " + gameManager.getBulletCount());
+                    bulletLabel.setVisible(true); // Hiện label lên
+                } else {
+                    bulletLabel.setText("Bullet: " + gameManager.getBulletCount());
+                }
                 if (gameManager.isGameOver()) {
                     gameTimer.stop();
                     showEndGameScreen(false, gameManager.getScore());
+                    Sound.getInstance().stopMusic();
+                    Sound.getInstance().playSound("gameover");
                 } else if (gameManager.isGameWon()) {
                     gameTimer.stop();
                     showEndGameScreen(true, gameManager.getScore());
+                    Sound.getInstance().stopMusic();
+
                 }
             }
         };
@@ -114,7 +128,11 @@ public class ArkanoidGame extends Application {
         // 6. Tạo Scene và hiển thị
         Scene gameScene = new Scene(root);
         gameScene.setOnMouseMoved(e -> gameManager.handleMouseInput(e.getX()));
-
+        gameScene.setOnKeyPressed(e -> {
+            if (e.getCode() == javafx.scene.input.KeyCode.SPACE) {
+                gameManager.handleShoot();
+            }
+        });
         primaryStage.setScene(gameScene);
         gameTimer.start();
     }
@@ -140,10 +158,15 @@ public class ArkanoidGame extends Application {
             imagePath = "/images/you_win_background.jpg";
             message = "YOU WIN!\nFinal Score: " + finalScore;
             messageColor = Color.LIMEGREEN;
+            Sound.getInstance().stopMusic();
+            Sound.getInstance().playSound("gamewin");
         } else {
             imagePath = "/images/game_over_background.jpg";
             message = "GAME OVER\nFinal Score: " + finalScore;
             messageColor = Color.RED;
+            Sound.getInstance().stopMusic();
+            Sound.getInstance().playSound("gameover");
+
         }
 
         Image backgroundImage = new Image(ArkanoidGame.class.getResource(imagePath).toString());

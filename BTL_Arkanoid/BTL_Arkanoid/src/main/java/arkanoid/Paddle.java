@@ -3,11 +3,20 @@ package arkanoid;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Paddle extends MovableObject {
     private double speed;
+    private boolean isShooterActive = false;
+    private double GunWidth = 10;
+    private double GunHeight = 20;
+    private int bulletcount = 0;
+    private int expandCount = 0; // Đếm số lần đã Expand
+    private static final int MAX_EXPAND_COUNT = 4; //Giới hạn Expand
     private String currentPowerUp;
     private static final Image PADDLE_IMAGE = new Image(Paddle.class.getResource("/images/paddle.png").toString());
-
+    private static final Image GUN_IMAGINE = new Image(Paddle.class.getResource("/images/gun.png").toString());
     public Paddle(double x, double y, double width, double height) {
         super(x, y, width, height);
         this.speed = 5.0;
@@ -19,12 +28,51 @@ public class Paddle extends MovableObject {
     public void moveRight() { dx = speed; }
 
     public void stop() { dx = 0; }
+    public void removeShooterEffect() {
+        isShooterActive = false;
+        bulletcount = 0;
+    }
 
-    public void applyPowerUp(String powerUpType) {
+    public boolean applyPowerUp(String powerUpType) {
         this.currentPowerUp = powerUpType;
         if (powerUpType.equals("ExpandPaddle")) {
+            if(expandCount <= MAX_EXPAND_COUNT) {
             setWidth(getWidth() + 40);
+            expandCount++;
+            return true;
+            }
+        else {
+            return false;
         }
+        }else if(powerUpType.equals("Shooter")) {
+            isShooterActive = true;
+            bulletcount +=3;
+            return true;
+        }
+        return false;
+    }
+    public List<Bullet> shoot() {
+        List<Bullet> bullets = new ArrayList<>();
+        if (isShooterActive&& bulletcount > 0) {
+            // Tạo 2 viên đạn từ 2 bên paddle
+            double bulletWidth = 5;
+            double bulletHeight = 10;
+            bullets.add(new Bullet(getX() + (GunWidth / 2) - (bulletWidth / 2), getY(), bulletWidth, bulletHeight));
+            bullets.add(new Bullet(getX() + getWidth() - (GunWidth / 2) - (bulletWidth / 2), getY(), bulletWidth, bulletHeight));
+            bulletcount--;
+            if(bulletcount <=0){
+                isShooterActive = false;}
+        }
+        return bullets;
+    }
+    public int getBulletCount() {
+        return this.bulletcount;
+    }
+
+
+     // Kiểm tra xem súng có đang bật không
+    public boolean isShooterActive() {
+        return this.isShooterActive;
     }
 
     @Override
@@ -41,6 +89,11 @@ public class Paddle extends MovableObject {
 
     @Override
     public void render(GraphicsContext gc) {
+
         gc.drawImage(PADDLE_IMAGE, getX(), getY(), getWidth(), getHeight());
+        if (isShooterActive) {
+            gc.drawImage(GUN_IMAGINE, getX(), getY() - (GunHeight/2), GunWidth, GunHeight);
+            gc.drawImage(GUN_IMAGINE, getX() + getWidth() - GunWidth, getY() - (GunHeight/2), GunWidth, GunHeight);
+        }
     }
 }

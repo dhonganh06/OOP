@@ -12,7 +12,7 @@ public abstract class PowerUp extends GameObject {
         this.duration = duration;
     }
 
-    public abstract void applyEffect(Paddle paddle);
+    public abstract boolean applyEffect(Paddle paddle);
 
     public abstract void removeEffect(Paddle paddle);
 

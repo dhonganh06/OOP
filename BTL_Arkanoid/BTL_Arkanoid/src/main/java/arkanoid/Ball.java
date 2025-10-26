@@ -24,6 +24,7 @@ public class Ball extends MovableObject {
         } else if (other instanceof Brick) {
             directionY = -directionY;
         }
+        Sound.getInstance().playSound("bounce");
     }
 
     public boolean checkCollision(GameObject other) {
