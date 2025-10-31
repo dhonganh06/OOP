@@ -15,7 +15,6 @@ public class Shooterpowerup extends PowerUp {
 
     @Override
     public void removeEffect(Paddle paddle) {
-        //paddle.RemoveShooterEffect();
     }
 
     @Override

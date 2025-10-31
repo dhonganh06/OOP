@@ -21,7 +21,6 @@ public class Bomb extends PowerUp {
 
     @Override
     public void render(GraphicsContext gc) {
-        // Vẽ ảnh của quả bomb
         if (BOMB_IMAGE.isError()) {
             gc.setFill(javafx.scene.paint.Color.RED);
             gc.fillOval(getX(), getY(), getWidth(), getHeight());

@@ -12,8 +12,8 @@ public class Paddle extends MovableObject {
     private double GunWidth = 10;
     private double GunHeight = 20;
     private int bulletcount = 0;
-    private int expandCount = 0; // Đếm số lần đã Expand
-    private static final int MAX_EXPAND_COUNT = 4; //Giới hạn Expand
+    private int expandCount = 0;
+    private static final int MAX_EXPAND_COUNT = 4;
     private String currentPowerUp;
     private static final Image PADDLE_IMAGE = new Image(Paddle.class.getResource("/images/paddle.png").toString());
     private static final Image GUN_IMAGINE = new Image(Paddle.class.getResource("/images/gun.png").toString());
@@ -54,7 +54,6 @@ public class Paddle extends MovableObject {
     public List<Bullet> shoot() {
         List<Bullet> bullets = new ArrayList<>();
         if (isShooterActive&& bulletcount > 0) {
-            // Tạo 2 viên đạn từ 2 bên paddle
             double bulletWidth = 5;
             double bulletHeight = 10;
             bullets.add(new Bullet(getX() + (GunWidth / 2) - (bulletWidth / 2), getY(), bulletWidth, bulletHeight));
@@ -68,9 +67,6 @@ public class Paddle extends MovableObject {
     public int getBulletCount() {
         return this.bulletcount;
     }
-
-
-     // Kiểm tra xem súng có đang bật không
     public boolean isShooterActive() {
         return this.isShooterActive;
     }

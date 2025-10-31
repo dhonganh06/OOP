@@ -101,7 +101,6 @@ public class ArkanoidGame extends Application {
                 gameManager.updateGame();
                 gameManager.render(gc);
 
-                // Cập nhật text trên các Label của thanh UI
                 scoreLabel.setText("Score: " + gameManager.getScore());
                 levelLabel.setText("Level: " + gameManager.getCurrentLevel());
                 livesLabel.setText("Lives: " + gameManager.getLives());
@@ -111,12 +110,14 @@ public class ArkanoidGame extends Application {
                 } else {
                     bulletLabel.setText("Bullet: " + gameManager.getBulletCount());
                 }
-                if (gameManager.isGameOver()) {
+                GameManager.GameState state = gameManager.getCurrentState();
+
+                if (state == GameManager.GameState.GAME_OVER) {
                     gameTimer.stop();
                     showEndGameScreen(false, gameManager.getScore());
                     Sound.getInstance().stopMusic();
                     Sound.getInstance().playSound("gameover");
-                } else if (gameManager.isGameWon()) {
+                } else if (state == GameManager.GameState.GAME_WON) {
                     gameTimer.stop();
                     showEndGameScreen(true, gameManager.getScore());
                     Sound.getInstance().stopMusic();
@@ -125,7 +126,6 @@ public class ArkanoidGame extends Application {
             }
         };
 
-        // 6. Tạo Scene và hiển thị
         Scene gameScene = new Scene(root);
         gameScene.setOnMouseMoved(e -> gameManager.handleMouseInput(e.getX()));
         gameScene.setOnKeyPressed(e -> {
@@ -187,10 +187,9 @@ public class ArkanoidGame extends Application {
             showStartMenu();
         });
 
-        // Tạo nút "Exit"
         Button exitButton = new Button("Exit");
         exitButton.setStyle("-fx-font-size: 20px; -fx-padding: 10 20; -fx-background-radius: 10;");
-        exitButton.setOnAction(e -> primaryStage.close()); // Đóng ứng dụng
+        exitButton.setOnAction(e -> primaryStage.close());
         VBox buttonLayout = new VBox(20);
         buttonLayout.setAlignment(Pos.CENTER);
         buttonLayout.getChildren().addAll(endGameText, playAgainButton, exitButton);

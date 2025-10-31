@@ -3,7 +3,8 @@ package arkanoid;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
-
+import javafx.scene.text.Font;
+import javafx.scene.text.TextAlignment;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -13,6 +14,15 @@ import java.util.Iterator;
 import java.util.List;
 
 public class GameManager {
+    public enum GameState {
+        PLAYING,
+        TRANSITION,
+        GAME_OVER,
+        GAME_WON
+    }
+    private GameState currentState;
+    private long transitionStartTime;
+    private static final long TRANSITION_DELAY_NANOS = 500 * 1_000_000;
     private Paddle paddle;
     private Ball ball;
     private List<Brick> bricks;
@@ -22,11 +32,7 @@ public class GameManager {
     private int score;
     private int lives;
     private double rate;
-    private boolean gameOver;
-    private boolean gameWon;
     private int currentLevel;
-    public int brickdestroyed=0;
-
 
     public GameManager() {
         paddle = new Paddle(350, 490, 150, 30);
@@ -36,8 +42,7 @@ public class GameManager {
         bullets = new ArrayList<>();
         score = 0;
         lives = 3;
-        gameOver = false;
-        gameWon = false;
+        currentState = GameState.PLAYING;
         currentLevel = 1;
 
         try {
@@ -60,17 +65,20 @@ public class GameManager {
     public int getScore() { return this.score; }
     public int getLives() { return this.lives; }
     public int getCurrentLevel() { return this.currentLevel; }
-    public boolean isGameOver() { return this.gameOver; }
-    public boolean isGameWon() { return this.gameWon; }
+
+    public GameState getCurrentState() {
+        return this.currentState;
+    }
 
     private void loadLevel(int levelNumber) {
         bricks.clear();
         powerUps.clear();
+        bullets.clear();
         String levelFile = "/levels/level" + levelNumber + ".txt";
         try (InputStream is = GameManager.class.getResourceAsStream(levelFile);
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             if (is == null) {
-                gameWon = true;
+                currentState = GameState.GAME_WON;
                 return;
             }
             String line;
@@ -79,15 +87,15 @@ public class GameManager {
                 for (int col = 0; col < line.length(); col++) {
                     char blockType = line.charAt(col);
                     if (blockType == '1') {
-                        bricks.add(new Brick(col * 80 + 10, row * 30 + 50, 70, 20, "Normal", 1));
+                        bricks.add(new Brick(col * 70 + 10, row * 20 + 50, 70, 20, "Normal", 1));
                     } else if (blockType == '2') {
-                        bricks.add(new Brick(col * 80 + 10, row * 30 + 50, 70, 20, "Strong", 2));
+                        bricks.add(new Brick(col * 70 + 10, row * 20 + 50, 70, 20, "Strong", 2));
                     }
                 }
                 row++;
             }
         } catch (Exception e) {
-            gameWon = true;
+            currentState = GameState.GAME_WON;
             e.printStackTrace();
         }
         resetPaddleAndBall();
@@ -103,17 +111,25 @@ public class GameManager {
     }
 
     public void handleMouseInput(double mouseX) {
-        if (!gameOver && !gameWon) {
+        if (currentState == GameState.PLAYING) {
             paddle.setX(mouseX - paddle.getWidth() / 2);
         }
     }
     public void handleShoot() {
-        bullets.addAll(paddle.shoot());
+       if(currentState == GameState.PLAYING){
+           bullets.addAll(paddle.shoot());
+       }
     }
 
     public void updateGame() {
-        if (gameOver || gameWon) return;
-
+        if (currentState == GameState.GAME_OVER || currentState == GameState.GAME_WON) return;
+        if (currentState == GameState.TRANSITION) {
+            if(System.nanoTime() - transitionStartTime > TRANSITION_DELAY_NANOS) {
+                currentState = GameState.PLAYING;
+                loadLevel(currentLevel);
+            }
+            return;
+        }
         paddle.update();
         ball.update();
 
@@ -130,7 +146,6 @@ public class GameManager {
                 if (brick.isDestroyed()) {
                     score += 10;
                     ballBrickIterator.remove();
-                    brickdestroyed++;
                     rate = Math.random();
                     if (rate <=  0.2) {
                         powerUps.add(new ExpandPaddlePowerUp(brick.getX(), brick.getY(), 20, 20));
@@ -155,7 +170,7 @@ public class GameManager {
                     lives--;
                     score -= 50;
                     if(lives == 0){
-                        gameOver = true;
+                        currentState =  GameState.GAME_OVER;
                     }
                     if (score < 0) {
                         score = 0;
@@ -177,14 +192,11 @@ public class GameManager {
             }
         }
 
-        // 2. THÊM VÒNG LẶP CHO ĐẠN (BULLET)
-        // (Đảm bảo bạn đã thêm 'List<Bullet> bullets;' và khởi tạo nó)
         Iterator<Bullet> bulletIterator = bullets.iterator();
         while (bulletIterator.hasNext()) {
             Bullet bullet = bulletIterator.next();
             bullet.update();
 
-            // Xóa đạn nếu ra khỏi màn hình
             if (bullet.isOutOfBounds()) {
                 bulletIterator.remove();
                 continue;
@@ -194,16 +206,13 @@ public class GameManager {
             while (bulletBrickIterator.hasNext()) {
                 Brick brick = bulletBrickIterator.next();
                 if (bullet.checkCollision(brick)) {
-                    brick.takeHit(); // Gạch mất máu
-                    bulletIterator.remove(); // Xóa viên đạn
+                    brick.takeHit();
+                    bulletIterator.remove();
 
                     if (brick.isDestroyed()) {
                         score += 10;
-                        bulletBrickIterator.remove(); // <-- Sửa tên ở đây
-                        brickdestroyed++;
-                        // (Bạn có thể cho gạch bị đạn bắn vỡ cũng rơi ra PowerUp ở đây)
+                        bulletBrickIterator.remove();
                     }
-                    // Thoát vòng lặp gạch, vì đạn đã trúng 1 viên rồi
                     break;
                 }
             }
@@ -212,23 +221,21 @@ public class GameManager {
         if (ball.getY() > 600) {
             lives--;
             if (lives <= 0) {
-                gameOver = true;
+                currentState = GameState.GAME_OVER;
             } else {
                 resetPaddleAndBall();
             }
         }
 
-        if (currentLevel == 1 && brickdestroyed==9) {
-            currentLevel++;
-            brickdestroyed = 0;
-            loadLevel(currentLevel);
-        }else if (currentLevel == 2 && brickdestroyed==19) {
-            currentLevel++;
-            brickdestroyed = 0;
-            loadLevel(currentLevel);
-        }else if (currentLevel == 3&& brickdestroyed==56)  {
-                gameWon = true;
+        if (bricks.isEmpty()) {
+            if (currentLevel == 3) {
+                currentState = GameState.GAME_WON;
+            } else {
+                currentState = GameState.TRANSITION;
+                transitionStartTime = System.nanoTime();
+                currentLevel++;
             }
+        }
         }
 
 
@@ -250,6 +257,12 @@ public class GameManager {
         }
         for (Bullet bullet : bullets) {
             bullet.render(gc);
+        }
+        if (currentState == GameState.TRANSITION) {
+            gc.setFill(Color.WHITE);
+            gc.setFont(Font.font("Verdana", 50));
+            gc.setTextAlign(TextAlignment.CENTER);
+            gc.fillText("Level " + currentLevel, 400, 270);
         }
     }
 
